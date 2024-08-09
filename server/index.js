@@ -18,12 +18,40 @@ io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
   socket.on("join_room", (data) => {
-    socket.join(data);
-    console.log(`User with ID: ${socket.id} joined room: ${data}`);
+    socket.join(data.room);
+    console.log(`User with ID: ${socket.id} joined room: ${data.room}`);
+
+    // Notify all users in the room except the new user
+    socket.to(data.room).emit("user_joined", {
+      userId: socket.id,
+      username: data.username,
+      message: `${data.username} has joined the room.`,
+    });
   });
 
   socket.on("send_message", (data) => {
     socket.to(data.room).emit("receive_message", data);
+  });
+
+  socket.on("leave_room", (data) => {
+    socket.leave(data.room);
+    console.log(`User with ID: ${socket.id} left room: ${data.room}`);
+
+    // Notify all users in the room that the user has left
+    socket.to(data.room).emit("user_left", {
+      userId: socket.id,
+      username: data.username,
+      message: `${data.username} has left the room.`,
+    });
+  });
+
+  //typing notification
+  socket.on("typing", (data) => {
+    socket.to(data.room).emit("typing", data);
+  });
+
+  socket.on("stop_typing", (data) => {
+    socket.to(data.room).emit("stop_typing", data);
   });
 
   socket.on("disconnect", () => {
@@ -34,3 +62,5 @@ io.on("connection", (socket) => {
 server.listen(3001, () => {
   console.log("SERVER RUNNING");
 });
+
+
