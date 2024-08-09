@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import ScrollToBottom from "react-scroll-to-bottom";
-import EmojiPicker from 'emoji-picker-react';
-import "./index.css"; // Import Tailwind CSS
+import EmojiPicker from "emoji-picker-react";
 
+import { v4 as uuidv4 } from "uuid";
+import { MdDelete } from "react-icons/md";
 
 function Chat({ socket, username, room, leaveRoom }) {
   const [currentMessage, setCurrentMessage] = useState("");
@@ -14,6 +15,7 @@ function Chat({ socket, username, room, leaveRoom }) {
   const sendMessage = async () => {
     if (currentMessage !== "") {
       const messageData = {
+        id: uuidv4(),
         room: room,
         author: username,
         message: currentMessage,
@@ -26,7 +28,7 @@ function Chat({ socket, username, room, leaveRoom }) {
       await socket.emit("send_message", messageData);
       setMessageList((list) => [...list, messageData]);
       setCurrentMessage("");
-      setIsTyping(false); // Stop typing when message is sent
+      setIsTyping(false);
     }
   };
 
@@ -72,12 +74,20 @@ function Chat({ socket, username, room, leaveRoom }) {
       setTypingUsers((prev) => prev.filter((user) => user !== data.username));
     });
 
+    //listen for message deletion
+    socket.on("message_deleted", (messageId) => {
+      setMessageList((list) =>
+        list.filter((message) => message.id !== messageId)
+      );
+    });
+
     return () => {
       socket.off("receive_message");
       socket.off("user_joined");
       socket.off("user_left");
       socket.off("typing");
       socket.off("stop_typing");
+      socket.off("message_deleted");
     };
   }, [socket, typingUsers]);
 
@@ -101,10 +111,17 @@ function Chat({ socket, username, room, leaveRoom }) {
   };
 
   const onEmojiClick = (emojiObject) => {
-    setCurrentMessage(prevMessage => prevMessage + emojiObject.emoji);
+    setCurrentMessage((prevMessage) => prevMessage + emojiObject.emoji);
     setShowEmojiPicker(false);
   };
-  
+
+  //message delete function
+  const deleteMessage = (messageId) => {
+    socket.emit("delete_message", {
+      room: room,
+      messageId: messageId,
+    });
+  };
 
   return (
     <div className="flex flex-col h-[50rem]">
@@ -131,6 +148,14 @@ function Chat({ socket, username, room, leaveRoom }) {
                     <p>{messageContent.time}</p>
                     <p>{messageContent.author}</p>
                   </div>
+                  {messageContent.author === username && ( 
+                                    <button
+                                        className="delete-button"
+                                        onClick={() => deleteMessage(messageContent.id)}
+                                    >
+                                       <MdDelete />
+                                    </button>
+                                )}
                 </div>
               </div>
             );
@@ -138,7 +163,8 @@ function Chat({ socket, username, room, leaveRoom }) {
           <div id="typingIndicator">
             {typingUsers.length > 0 && (
               <p className="text-gray-400">
-                {typingUsers.join(", ")} {typingUsers.length > 1 ? "are" : "is"} typing...
+                {typingUsers.join(", ")} {typingUsers.length > 1 ? "are" : "is"}{" "}
+                typing...
               </p>
             )}
           </div>

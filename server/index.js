@@ -3,6 +3,7 @@ const app = express();
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+
 app.use(cors());
 
 const server = http.createServer(app);
@@ -14,18 +15,31 @@ const io = new Server(server, {
   },
 });
 
+const users = {}; // Track connected users
+
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
   socket.on("join_room", (data) => {
-    socket.join(data.room);
-    console.log(`User with ID: ${socket.id} joined room: ${data.room}`);
+    const { username, room } = data; 
+    socket.join(room);
+    users[socket.id] = { username, room };
+
+    // Notify other users that this user is online
+    socket.to(room).emit("user_online", { username });
+
+    const onlineUsers = Object.values(users)
+      .filter((user) => user.room === room)
+      .map((user) => user.username);
+
+    // Send the list of current online users to the newly connected user
+    socket.emit("online_users", onlineUsers);
 
     // Notify all users in the room except the new user
-    socket.to(data.room).emit("user_joined", {
+    socket.to(room).emit("user_joined", {
       userId: socket.id,
-      username: data.username,
-      message: `${data.username} has joined the room.`,
+      username: username,
+      message: `${username} has joined the room.`,
     });
   });
 
@@ -34,18 +48,25 @@ io.on("connection", (socket) => {
   });
 
   socket.on("leave_room", (data) => {
-    socket.leave(data.room);
-    console.log(`User with ID: ${socket.id} left room: ${data.room}`);
+    const { username, room } = data;
+    socket.leave(room);
+    
+    // Remove the user from the tracking object
+    delete users[socket.id];
+    console.log(`User with ID: ${socket.id} left room: ${room}`);
 
     // Notify all users in the room that the user has left
-    socket.to(data.room).emit("user_left", {
+    socket.to(room).emit("user_left", {
       userId: socket.id,
-      username: data.username,
-      message: `${data.username} has left the room.`,
+      username: username,
+      message: `${username} has left the room.`,
     });
+
+    // Notify others in the room that this user is offline
+    io.to(room).emit("user_offline", { username });
   });
 
-  //typing notification
+  // Typing notification
   socket.on("typing", (data) => {
     socket.to(data.room).emit("typing", data);
   });
@@ -54,13 +75,32 @@ io.on("connection", (socket) => {
     socket.to(data.room).emit("stop_typing", data);
   });
 
-  socket.on("disconnect", () => {
-    console.log("User Disconnected", socket.id);
+  // Message deletion
+  socket.on("delete_message", (messageData) => {
+    const { room, messageId } = messageData;
+    socket.to(room).emit("message_deleted", messageId);
+  });
+
+  // Handle user disconnect
+  socket.on('disconnect', () => {
+    const user = users[socket.id];
+
+    if (user) {
+      const { username, room } = user;
+
+      // Remove the user from the users object
+      delete users[socket.id];
+
+      // Notify others in the room that this user is offline
+      io.to(room).emit('user_offline', { username });
+
+      console.log(`User with ID: ${socket.id} disconnected from room: ${room}`);
+    } else {
+      console.log(`User with ID: ${socket.id} disconnected, but no user data found.`);
+    }
   });
 });
 
 server.listen(3001, () => {
   console.log("SERVER RUNNING");
 });
-
-

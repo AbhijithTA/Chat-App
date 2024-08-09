@@ -1,7 +1,8 @@
+import React, { useState, useEffect } from "react";
 import "./index.css"; // Import Tailwind CSS
 import io from "socket.io-client";
-import { useState } from "react";
-import Chat from "./Chat";
+import Chat from "./components/Chat";
+import ParticipantsList from "./components/RoomParticipants";
 
 const socket = io.connect("http://localhost:3001");
 
@@ -9,6 +10,45 @@ function App() {
   const [username, setUsername] = useState("");
   const [room, setRoom] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [participants, setParticipants] = useState([]); // State to hold all members
+  const [activeUsers, setActiveUsers] = useState([]); // State to hold only active members
+
+  useEffect(() => {
+    if (showChat) {
+      socket.on("user_online", (data) => {
+        setParticipants((prevParticipants) => {
+          if (!prevParticipants.includes(data.username)) {
+            return [...prevParticipants, data.username];
+          }
+          return prevParticipants;
+        });
+
+        setActiveUsers((prevActiveUsers) => {
+          if (!prevActiveUsers.includes(data.username)) {
+            return [...prevActiveUsers, data.username];
+          }
+          return prevActiveUsers;
+        });
+      });
+
+      socket.on("user_offline", (data) => {
+        setActiveUsers((prevActiveUsers) =>
+          prevActiveUsers.filter((user) => user !== data.username)
+        );
+      });
+
+      socket.on("online_users", (users) => {
+        setParticipants(users);
+        setActiveUsers(users);
+      });
+
+      return () => {
+        socket.off("user_online");
+        socket.off("user_offline");
+        socket.off("online_users");
+      };
+    }
+  }, [showChat]);
 
   const joinRoom = () => {
     if (username !== "" && room !== "") {
@@ -22,6 +62,8 @@ function App() {
     setShowChat(false);
     setRoom("");
     setUsername("");
+    setParticipants([]); 
+    setActiveUsers([]);  
   };
 
   return (
@@ -53,12 +95,13 @@ function App() {
           </button>
         </div>
       ) : (
-        <Chat socket={socket} username={username} room={room} leaveRoom={leaveRoom} />
+        <div className="flex gap-2">
+          <Chat socket={socket} username={username} room={room} leaveRoom={leaveRoom} />
+          <ParticipantsList participants={participants} currentUser={username} activeUsers={activeUsers} /> {/* Pass activeUsers */}
+        </div>
       )}
     </div>
   );
 }
 
 export default App;
-
-
