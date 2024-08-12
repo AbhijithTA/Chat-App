@@ -10,8 +10,8 @@ function App() {
   const [username, setUsername] = useState("");
   const [room, setRoom] = useState("");
   const [showChat, setShowChat] = useState(false);
-  const [participants, setParticipants] = useState([]); // State to hold all members
-  const [activeUsers, setActiveUsers] = useState([]); // State to hold only active members
+  const [participants, setParticipants] = useState([]); 
+  const [activeUsers, setActiveUsers] = useState([]); 
 
   useEffect(() => {
     if (showChat) {

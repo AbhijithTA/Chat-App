@@ -10,12 +10,12 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Change this to your frontend URL in production
+    origin: "http://localhost:3000", 
     methods: ["GET", "POST"],
   },
 });
 
-const users = {}; // Track connected users
+const users = {}; 
 
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
@@ -101,7 +101,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Set the port dynamically using an environment variable, defaulting to 3001
+
 const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
